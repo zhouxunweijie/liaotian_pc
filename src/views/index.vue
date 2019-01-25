@@ -2,27 +2,40 @@
     <div class="content">
       <div class="friend">
         <ul>
-          <liItem v-for="(el ,index) in friendsList" :key="index" @showContent="showContent(index,el)" :class="{show:isShow === index}" :item="el" :index="index"></liItem>
+          <!-- <liItem v-for="(el ,index) in friendList" :key="index" @showContent="showContent(index,el)" :class="{show:isShow === index}" :item="el" :index="index"/> -->
+          <li @click="showContent(index,el)" v-for="(el ,index) in friendList" :key="index" :class="{show:isShow === index}">
+            <img :src="el.userHead" alt="">
+            <div class="li_content">
+              <div class="li_title">
+                <span>{{el.nickName}}</span>
+                <!-- <i>{{item.birth | moment}}</i> -->
+              </div>
+              <div class="msg_content">
+                <p v-html="el.msg"></p>
+                <i v-show="el.hint" v-text="el.hint"></i>
+              </div>
+            </div>
+          </li>
         </ul>
       </div>
       <div class="chat_content" v-show="msgContentType">
         <div class="div1">
-          <div class="nikeName">小可爱</div>
+          <div class="nikeName">{{friend.nickName}}</div>
           <div class="msg_content" id="msg_content">
-              <div v-for="(el, index) in rocerd" :key="index">
+              <div v-for="(el, index) in messageList" :key="index">
                 <left-content v-if="el.msgType === 1" :item="el"></left-content>
                 <right-content v-if="el.msgType === 2" :item="el"></right-content>
               </div>
           </div>
         </div>
         <div class="div2">
-          <div class="utils">
-            <span class="biaoqing" @click="ShowEmotion()"></span>
-          </div>
-          <textarea class="input_content" @keydown.enter="postMsg()" v-model="content" spellcheck="false">
+          <!-- <div class="utils"> -->
+            <!-- <span class="biaoqing" @click="ShowEmotion()"></span> -->
+          <!-- </div> -->
+          <textarea class="input_content" @keydown.enter="postMessage" v-model="content" spellcheck="false">
             
           </textarea>
-          <emotion @emotion="handleEmotion" class="emotion" v-show="isShow"></emotion>
+          <!-- <emotion @emotion="handleEmotion" class="emotion" v-show="isShow"></emotion> -->
         </div>
       </div>
       <div class="chat_content" v-show="!msgContentType"></div>
@@ -34,9 +47,10 @@
 import liItem from './components/liItem'
 import rightContent from './components/RightContent'
 import leftContent from './components/LeftContent'
-import emotion from './components/Emotion'
+//import emotion from './components/Emotion'
 import store from '@/store'
 import utils from '@/common/utils'
+import { mapGetters, mapActions, mapState } from 'vuex'
 
 export default {
   data () {
@@ -48,88 +62,33 @@ export default {
     }
   },
   computed: {
-    rocerd () {
-      return this.$store.state.rocerd
-    },
-    // username () {
-    //   return localStorage.getItem('username')
-    // },
-    friendsList () {
-      return this.$store.state.friendsList
-    }
+    ...mapGetters(['messageList']),
+    ...mapState({
+      friend: state => state.friend,
+      friendList: state => state.friendList,
+    })
   },
   methods: {
+    ...mapActions(['postMsg']),
     // 当前点击好友时获取当前好友信息
     showContent (index, item) {
-      console.log(index,item)
-      this.item = item
+      this.$store.state.friend = item
       this.isShow = index;
       this.msgContentType = true
-      // 获取当前用户的聊天信息
-      this.$store.dispatch('getContentMsg')
+      
       // 将滚动条置到底部
       this.scrollToBottom()
-      // 保存当前聊天好友的信息
-      localStorage.setItem('friendUserName', this.item.username)
-      localStorage.setItem('friendImg', this.item.imgUrl)
-      utils.setStorage('friendsList', this.item.username, this.item, 2) // 设置当前好友的未读条数为0
-      this.$store.dispatch('getFriendsList') // 触发当前获取好友列表的dispatch
-    },
-    // 显示或隐藏当前的表情框
-    ShowEmotion () {
-      if (this.isShow) {
-        this.isShow = false
-      } else {
-        this.isShow = true
-      }
+
     },
     // 发送信息
-    postMsg () {
+    postMessage () {
       var that = this
-      this.isShow = false
-      window.YTX.postMsg(1, that.content, this.item.username, function (res) {
-        let record = {
-          id: res.msgClientNo, // 服务器返回的消息ID
-          content: that.content,
-          type: 1,
-          imgUrl: localStorage.getItem('portrait'),
-          msgType: 2,
-          time: new Date().getTime()
-        }
-
-        utils.pushStorage('notSubmitRocerd', that.item.username, record)
-
-        that.content = ''
-
-        store.dispatch('getContentMsg')
-
-        // 设置当前好友列表的最新消息
-        utils.setStorage('friendsList', that.item.username, that.item, 2) // 设置当前好友的未读条数为0
-        that.$store.dispatch('getFriendsList') // 触发当前获取好友列表的dispatch
-        // that.$emit('getContent', that.username)
-      })
-    },
-    handleEmotion (i) {
-      var that = this
-      this.ShowEmotion()
-      window.YTX.postMsg(1, i, this.item.username, function (res) {
-        let record = {
-          id: res.msgClientNo, // 服务器返回的消息ID
-          content: i,
-          type: 2,
-          imgUrl: localStorage.getItem('portrait'),
-          msgType: 2,
-          time: new Date().getTime()
-        }
-
-        utils.pushStorage('notSubmitRocerd', that.item.username, record)
-
-        store.dispatch('getContentMsg')
-        // that.$emit('getContent', that.username)
-
-        // 设置当前好友列表的最新消息
-        utils.setStorage('friendsList', that.item.username, that.item, 2) // 设置当前好友的未读条数为0
-        that.$store.dispatch('getFriendsList') // 触发当前获取好友列表的dispatch
+      this.postMsg({
+        content: this.content,
+        msgType: 2,
+        msgDateCreated: new Date().getTime()
+      }).then(res => {
+        this.content = ''
       })
     },
     scrollToBottom () {
@@ -140,20 +99,23 @@ export default {
     }
   },
   watch: {
-    'rocerd': function (arr) {
-      console.log(arr, '改变之后的值')
+    'messageList': function (arr) {
       this.scrollToBottom()
+    },
+    '$store.state.friendList': function (arr) {
+      console.log(arr, '好友列表信息改变了')
     }
   },
   mounted () {
     // 触发当前获取所有好友列表
-    this.$store.dispatch('getFriendsList')
+    this.$store.commit('getFriendList')
+    // 触发当前获取所有好友聊天记录
+    this.$store.commit('getMessage')
   },
   components:{
     liItem,
     rightContent,
-    leftContent,
-    emotion
+    leftContent
   }
 }
 </script>
@@ -250,7 +212,7 @@ export default {
     background-image: url(../assets/images/biaoqing.png)
   }
   .chat_content .div2 .input_content{
-    height: 143px;
+    height: 178px;
     font-style: 12px;
     color: #000;
     display: block;
@@ -258,7 +220,7 @@ export default {
     font-family: inherit;
     box-sizing: border-box;
     width: calc( 100% + 20px );
-    padding: 0 20px 5px 10px;
+    padding: 10px 20px 5px 10px;
   }
   .chat_content .div2 .emotion{
     position: absolute;
@@ -268,4 +230,68 @@ export default {
     background: #fff;
   }
   
+   li{
+    padding: 5px 8px;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  li:hover{
+    background-color:#3e3e3e
+  }
+  li img{
+    width: 50px;
+    height: 50px;
+    display: block;
+    float: left;
+    border-radius: 50%
+  }
+  li .li_content{
+    float: left;
+    width: calc(100% - 50px);
+    padding: 5px;
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box
+  }
+  li .li_content .li_title{
+    margin-top: 5px;
+    margin-bottom: 10px;
+  }
+  li .li_content .li_title span{
+    display: inline-block;
+    width: calc(100% - 45px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color:#d0cfcf
+  }
+  li .li_content .li_title i{
+    display: block;
+    width: 45px;
+    float: right;
+    transform: scale(.8);
+  }
+  li .li_content .msg_content{
+    position: relative;
+  }
+  li .li_content .msg_content p{
+    width: calc(100% - 5px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  li .li_content .msg_content i{
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: #ff3b30;
+    right: -8px;
+    bottom: 0;
+    transform: scale(0.8);
+    text-align: center;
+    line-height: 15px;
+    font-style: normal;
+  }
 </style>

@@ -1,9 +1,9 @@
 <template>
   <li @click="showContent">
-      <img :src="item.imgUrl" alt="">
+      <img :src="item.userHead" alt="">
       <div class="li_content">
         <div class="li_title">
-          <span>{{item.nickName}}</span>
+          <span>{{item.nickName}}{{item}}</span>
           <!-- <i>{{item.birth | moment}}</i> -->
         </div>
         <div class="msg_content">
@@ -25,7 +25,7 @@ export default {
   },
   methods: {
     showContent () {
-      console.log(this.item, 'dfagagfasghag')
+      this.$store.state.friend = this.item
       this.$emit('showContent')
     }
   },

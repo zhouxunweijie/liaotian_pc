@@ -1,9 +1,7 @@
 import MD5 from 'js-md5'
-import axios from '@/assets/js/http'
 import store from '@/store'
 
 let RL_YTX = window.RL_YTX
-console.log(RL_YTX)
 
 function IM () {
   // 应用ID
@@ -15,7 +13,7 @@ function IM () {
   // 当前登录状态
   this.loginType = 1
   // 用户名
-  this.userName = ''
+  this.userName = '00001'
   // 昵称
   this.nickName = ''
   // 出生年月
@@ -48,13 +46,9 @@ IM.prototype = {
       // 不支持HTML5，关闭页面//用户逻辑处理}
     } else if (resp.code === 200) {}
     // 通过自己的服务器获取完登录用户信息后登录
-    this.getUser().then(() => {
-      // 登录
-      this.login()
-
-      // 获取当前好友列表
-      this.getFriendsList()
-    })
+    
+    // 客服登陆
+    this.login()
   },
   /**
    * 登录
@@ -79,161 +73,61 @@ IM.prototype = {
       RL_YTX.onMsgReceiveListener(function (obj) {
         // 收到push消息或者离线消息或判断输入状态//如果obj.msgType==12  判断obj.msgDomainn的值//obj.msgDomain 0 无输入状态  1 正在输入  2 正在录音
         console.log('有新的消息', obj)
-        store.dispatch('postMsg', obj)
+        store.dispatch('newestMsg', {
+          msgDateCreated: obj.msgDateCreated,
+          msgSender: obj.msgSender,
+          content: obj.msgContent,
+          msgType: 1,
+          senderId: obj.msgDomain
+        })
       })
     }, function (obj) {
       console.log('登录失败')
     })
   },
   /**
-   * 获取当前好友列表
-   */
-  getFriendsList () {
-    return axios.GET('getFriendsList', {}).then((res) => {
-      let data = res.data
-      let record = JSON.parse(localStorage.getItem('record'))
-      let notSubmitRocerd = JSON.parse(localStorage.getItem('notSubmitRocerd'))
-      if (res.code === 200) {
-        // 判断当前是否有没有聊天记录储存容器
-        if (!record || !notSubmitRocerd) {
-          // 已经提交聊天记录容器
-          if (!record) {
-            localStorage.setItem('record', JSON.stringify({}))
-          }
-          // 未提交记录容器
-          if (!notSubmitRocerd) {
-            localStorage.setItem('notSubmitRocerd', JSON.stringify({}))
-          }
-        } else {
-          // 如果当前好友列表我空就不用循环了
-          if (data.length > 0) {
-            data.forEach((element, index) => {
-              if (record[element.username] || notSubmitRocerd[element.username]) {
-                if (notSubmitRocerd[element.username].length > 0) {
-                  data[index]['msg'] = ((notSubmitRocerd[element.username])[notSubmitRocerd[element.username].length - 1]).content
-                } else if (record[element.username].length > 0) {
-                  data[index]['msg'] = ((record[element.username])[record[element.username].length - 1]).content
-                }
-              }
-            })
-          }
-        }
-        console.log(data, '#####################')
-        // 设置当前好友列表
-        localStorage.setItem('friendsList', JSON.stringify(data))
-        // 触发重新渲染好友列表
-        store.dispatch('getFriendsList')
-        localStorage.setItem('isFriendsList', true)
-      }
-    })
-  },
-  /**
-   * 向服务器发送没有提交的数据（消息）
-   */
-  postRecord () {
-    var notSubmitRocerd = JSON.parse(localStorage.getItem('notSubmitRocerd'))
-    if (JSON.stringify(notSubmitRocerd) === '{}') {
-      return false
-    }
-    axios.POST('record', notSubmitRocerd).then((res) => {
-      if (res.code === 200) {
-        var record = JSON.parse(localStorage.getItem('record'))
-        for (var i in notSubmitRocerd) {
-          record[i].push(...notSubmitRocerd[i])
-        }
-        console.log(record)
-        localStorage.setItem('record', JSON.stringify(record))
-        localStorage.setItem('notSubmitRocerd', '{}')
-        console.log('当前用户历史数据已经提交')
-      }
-    })
-  },
-  /**
    * 当前只能够发送文本信息和图片信息
    * 向当前好友发送信息
    */
-  postMsg (msgType, data, id, callback) {
-    var msgid = new Date().getTime()
-    // 新建消息体对象
-    var obj = new RL_YTX.MsgBuilder()
-    // 设置自定义消息id
-    obj.setId(msgid)
-    // 设置发送的消息类型1:文本消息 4:图片消息 6:压缩文件 7:非压缩文件
-    // 发送非文本消息时，text字段将被忽略，发送文本消息时 file字段将被忽略
-    obj.setType(msgType)
-    // 设置接收者
-    obj.setReceiver(id)
-    if (msgType === 1 || msgType === 2) {
-      // 设置发送的文本内容
-      obj.setText(data)
-      RL_YTX.sendMsg(obj, function (res) {
-      // 发送消息成功
-      // 处理用户逻辑，通知页面
-        callback(res)
-        console.log(res, '消息发送成功')
-      }, function (res) { // 失败
-      // 发送消息失败
-      // 处理用户逻辑，通知页面刷新，展现重发按钮
-        console.log(res, '发送消息失败')
-      })
-    } else if (msgType === 4) {
-      obj.setFile(data)
-      RL_YTX.sendMsg(obj, function (res) {
-      // 发送消息成功
-      // 处理用户逻辑，通知页面
-        callback(res)
-      }, function (obj) { // 失败
-      // 发送消息失败
-      // 处理用户逻辑，通知页面刷新，展现重发按钮
-      }, function (sended, total) {
-      // 发送图片或附件时的进度条
-      // 如果发送文本消息，可以不传该参数
-      })
-    }
-  },
-  /**
-   * 获取当前个人信息
-   */
-  getUser () {
-    var that = this
-    // RL_YTX.getMyInfo(function (obj) {
-    //   console.log(obj, '当前个人信息')
-    //   that.nickName = obj.nickName // 昵称
-    //   that.version = obj.version // 信息版本号
-    //   that.sex = obj.sex // 当前性别
-    //   that.sign = obj.sign //  个性签名
-    //   that.birth = obj.birth // 出生年月
-    // })
-    return axios.GET('/userList', {}).then((res) => {
-      var obj = res.data
-      that.nickName = obj.nickName // 昵称
-      that.version = obj.version // 信息版本号
-      that.sex = obj.sex // 当前性别
-      that.sign = obj.sign //  个性签名
-      that.birth = obj.birth // 出生年月
-      that.userName = obj.userName
-      that.portrait = obj.portrait // 登录人头像
-      localStorage.setItem('username', that.userName)
-      localStorage.setItem('portrait', that.portrait)
-      console.log('个人信息获取成功')
-      // return new Promise((resolve) => {
-      //   resolve(obj)
-      // })
-    })
-  },
-  /**
-   * 设置当前个人信息
-   */
-  setUser ({nickName = '', sex = 1, birth = '1990-01-01', sign = ''}) {
-    var that = this
-    var uploadPersonInfoBuilder = new RL_YTX.UploadPersonInfoBuilder()
-    uploadPersonInfoBuilder.setNickName(nickName)
-    uploadPersonInfoBuilder.setSex(sex)
-    uploadPersonInfoBuilder.setBirth(birth)
-    uploadPersonInfoBuilder.setSign(sign)
-    RL_YTX.uploadPerfonInfo(uploadPersonInfoBuilder, function (obj) {
-      that.version = obj.version // 设置当前个人信息版本号
-      console.log('修改完成')
+  postMsg (msgType, data, id) {
+    return new Promise(resolve => {
+      var msgid = new Date().getTime()
+      // 新建消息体对象
+      var obj = new RL_YTX.MsgBuilder()
+      // 设置自定义消息id
+      obj.setId(msgid)
+      // 设置发送的消息类型1:文本消息 4:图片消息 6:压缩文件 7:非压缩文件
+      // 发送非文本消息时，text字段将被忽略，发送文本消息时 file字段将被忽略
+      obj.setType(msgType)
+      // 设置接收者
+      obj.setReceiver(id)
+      if (msgType === 1 || msgType === 2) {
+        // 设置发送的文本内容
+        obj.setText(data)
+        RL_YTX.sendMsg(obj, function (res) {
+        // 发送消息成功
+        // 处理用户逻辑，通知页面
+          resolve(res)
+          console.log(res, '消息发送成功')
+        }, function (res) { // 失败
+        // 发送消息失败
+        // 处理用户逻辑，通知页面刷新，展现重发按钮
+          console.log(res, '发送消息失败')
+        })
+      } else if (msgType === 4) {
+        obj.setFile(data)
+        RL_YTX.sendMsg(obj, function (res) {
+        // 发送消息成功
+        // 处理用户逻辑，通知页面
+          resolve(res)
+        }, function (obj) { // 失败
+        // 发送消息失败
+        // 处理用户逻辑，通知页面刷新，展现重发按钮
+        }, function (sended, total) {
+        // 发送图片或附件时的进度条
+        // 如果发送文本消息，可以不传该参数
+        })
+      }
     })
   }
 }
